@@ -15,7 +15,7 @@ from langgraph.graph import StateGraph, END
 
 # 1. 환경 설정 및 로드
 load_dotenv()
-persist_dir = "../database/Cultural_db"
+persist_dir = "Cultural_db"
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 embedding_model = HuggingFaceEmbeddings(model_name="bespin-global/klue-sroberta-base-continue-learning-by-mnr")
@@ -82,11 +82,12 @@ def generate_node(state: GraphState):
     context_combined = "\n\n".join(all_contexts)
     
     prompt = [
-        ("system", """당신은 실시간 검색 결과를 바탕으로 답변하는 전문가입니다.
-1. [데이터] 섹션의 '검색된 실시간 정보'는 현재 시점의 실제 정보입니다. 
-2. 당신의 내부 가이드라인보다 [데이터]의 내용을 우선하십시오.
-3. 절대 "기상청을 확인하라"거나 "정보가 없다"는 말을 하지 마십시오.
-4. [데이터]에 적힌 날씨, 기온, 하늘 상태 중 하나라도 있다면 그것을 활용해 구체적으로 답하십시오."""), 
+        ("system", """당신은 전문 분석가입니다.
+1. 모든 답변은 반드시 마크다운(Markdown) 형식을 사용하십시오.
+2. 주제에 맞는 적절한 ## 제목과 ### 소제목을 사용하여 구조화하십시오.
+3. 핵심 용어는 **굵게** 표시하고, 목록은 불렛 포인트(*)를 사용하십시오.
+4. 텍스트를 나열하지 말고, 독자가 한눈에 읽기 편하도록 문단을 나누십시오."""),
+        
         ("user", f"[데이터]:\n{context_combined}\n\n질문:\n{state['question']}")
     ]
     
