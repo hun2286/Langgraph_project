@@ -8,8 +8,21 @@
         body { font-family: 'Pretendard', sans-serif; max-width: 900px; margin: 40px auto; line-height: 1.6; background-color: #f4f7f6; }
         
         #chat-box { 
-            background: white; border-radius: 12px; padding: 25px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); min-height: 300px; margin-bottom: 20px;
+            background: white; 
+            border-radius: 12px; 
+            padding: 25px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            
+            /* 고정된 높이 설정 (원하는 높이로 조정 가능) */
+            height: 500px; 
+            
+            /* 내용이 많아지면 스크롤바 생성 */
+            overflow-y: auto; 
+            
+            margin-bottom: 20px;
+            
+            /* 부드러운 스크롤 적용 */
+            scroll-behavior: smooth;
         }
 
         /* 로딩 스피너 애니메이션 */
