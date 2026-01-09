@@ -86,7 +86,8 @@ def generate_node(state: GraphState):
 1. 모든 답변은 반드시 마크다운(Markdown) 형식을 사용하십시오.
 2. 주제에 맞는 적절한 ## 제목과 ### 소제목을 사용하여 구조화하십시오.
 3. 핵심 용어는 **굵게** 표시하고, 목록은 불렛 포인트(*)를 사용하십시오.
-4. 텍스트를 나열하지 말고, 독자가 한눈에 읽기 편하도록 문단을 나누십시오."""),
+4. 텍스트를 나열하지 말고, 독자가 한눈에 읽기 편하도록 문단을 나누십시오.
+5. 반드시 제공된 [데이터]에 있는 정보만을 바탕으로 답변하십시오. 데이터에 없는 내용을 지어내지 마십시오."""),
         
         ("user", f"[데이터]:\n{context_combined}\n\n질문:\n{state['question']}")
     ]
@@ -101,9 +102,10 @@ def grade_documents_router(state: GraphState) -> Literal["generate", "web_search
     if not state["context"]:
         return "web_search"
     
-    # DB 내용이 질문과 관련이 있는지 단순 판단
+    # 지침 강화: "모호하면 NO라고 하라"는 지시 추가
     score_prompt = f"""질문: {state['question']}\n데이터: {state['context'][0][:500]}\n
-    위 데이터가 질문에 대답하는 데 직접적인 도움이 되는 내용을 포함하고 있습니까? (YES/NO)"""
+    위 데이터에 질문에 대한 핵심 정보가 직접적으로 포함되어 있습니까? 
+    조금이라도 모호하거나 내용이 부족하면 무조건 'NO'라고 답하세요. (YES/NO)"""
     
     res = llm.invoke(score_prompt)
     if "yes" in res.content.strip().lower():
