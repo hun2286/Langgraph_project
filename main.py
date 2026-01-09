@@ -1,9 +1,7 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from agent import app 
-import json
-import asyncio
+from agent import app  # 질문자님의 에이전트
 import uvicorn
 
 api_app = FastAPI()
@@ -15,22 +13,31 @@ async def home(request: Request):
 
 @api_app.post("/chat")
 async def chat(request: Request):
+    # 1. 클라이언트로부터 질문 데이터 수신 (비동기)
     data = await request.json()
     question = data.get("question")
 
-    async def generate():
-        inputs = {"question": question, "context": [], "sources": [], "retry_count": 0}
-        
-        # 노드 단위 스트리밍
-        for output in app.stream(inputs):
-            for key, value in output.items():
-                if key == "generate":
-                    answer = value['answer']
-                    # 브라우저에 한 번에 쏘지 않고 '전송' 단위를 보냄
-                    yield f"data: {json.dumps({'answer': answer})}\n\n"
-        yield "data: [DONE]\n\n"
+    # 2. 에이전트 입력값 설정
+    inputs = {"question": question, "context": [], "sources": [], "retry_count": 0}
+    
+    try:
+        # 3. 비동기 방식으로 에이전트 실행 (ainvoke 사용)
+        # 이 과정에서 서버의 이벤트 루프가 차단되지 않고 다른 요청을 처리할 수 있습니다.
+        result = await app.ainvoke(inputs)
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+        # 4. 최종 답변 추출
+        answer = result.get("answer", "답변을 생성할 수 없습니다.")
+        
+        # 5. JSON 형식으로 응답 반환
+        return JSONResponse(content={"answer": answer})
+
+    except Exception as e:
+        print(f"에러 발생: {e}")
+        return JSONResponse(
+            status_code=500, 
+            content={"answer": "서버 처리 중 오류가 발생했습니다."}
+        )
 
 if __name__ == "__main__":
-    uvicorn.run("main:api_app", host="127.0.0.1", port=8000)
+    # 개발 편의를 위해 reload=True 권장
+    uvicorn.run("main:api_app", host="127.0.0.1", port=8000, reload=True)
