@@ -79,14 +79,14 @@
             const submitBtn = document.getElementById('submit-btn');
             const chatBox = document.getElementById('chat-box');
             const question = inputElement.value;
-            
+        
             if(!question.trim()) return;
 
-            // 1. 입력창 비우고 버튼 비활성화 (중복 클릭 방지)
+            // 1. 입력창 비우고 버튼 비활성화
             inputElement.value = ""; 
             submitBtn.disabled = true;
 
-            // 2. 대기 상태 표시 (스피너 애니메이션)
+            // 2. 대기 상태 표시
             chatBox.innerHTML = `
                 <div class="loading-container">
                     <div class="loader"></div>
@@ -95,6 +95,7 @@
             `;
 
             try {
+                // 3. 비동기 POST 요청 (main.py의 /chat 호출)
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -103,37 +104,18 @@
 
                 if (!response.ok) throw new Error("서버 응답 오류");
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let fullText = "";
+                // 4. [중요] 통째로 넘어온 JSON 데이터를 기다렸다가 받음
+                const data = await response.json();
 
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataContent = line.replace('data: ', '').trim();
-                            if (dataContent === '[DONE]') break;
-
-                            try {
-                                const parsed = JSON.parse(dataContent);
-                                if (parsed.answer) {
-                                    fullText = parsed.answer;
-                                    // 답변이 오기 시작하면 스피너를 지우고 마크다운 렌더링
-                                    chatBox.innerHTML = marked.parse(fullText);
-                                }
-                            } catch (e) { console.error("JSON 파싱 에러", e); }
-                        }
-                    }
+                // 5. 마크다운 변환 후 화면에 표시 및 자동 스크롤
+                if (data.answer) {
+                    chatBox.innerHTML = marked.parse(data.answer);
                 }
+
             } catch (error) {
                 chatBox.innerHTML = `<span style="color:red;">오류 발생: ${error.message}</span>`;
             } finally {
-                // 3. 버튼 다시 활성화
+                // 6. 버튼 다시 활성화
                 submitBtn.disabled = false;
             }
         }
