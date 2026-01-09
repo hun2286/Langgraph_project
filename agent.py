@@ -51,7 +51,7 @@ def retrieve_node(state: GraphState):
 def web_search_node(state: GraphState):
     print("\n--- [Node] 웹 검색 수행 중 ---")
     
-    # [수정] 검색어에 날짜를 넣지 말고 지역명과 날씨 위주로 생성하도록 유도
+    # 검색어에 날짜를 넣지 말고 지역명과 날씨 위주로 생성하도록 유도
     query_gen_prompt = f"""사용자 질문: {state['question']}
 위 질문에 대해 가장 최신 정보를 찾을 수 있는 검색어 1개만 생성하세요.
 - 날씨의 경우 '지역명 날씨' 형태로 생성하세요 (예: 광주 수기동 날씨)
@@ -63,7 +63,7 @@ def web_search_node(state: GraphState):
     
     results = web_search_tool.invoke(search_query)
     
-    # [수정] 데이터가 리스트 형태면 읽기 쉽게 변환
+    # 데이터가 리스트 형태면 읽기 쉽게 변환
     if isinstance(results, list):
         content_text = "\n".join([f"- {res.get('snippet', '')}" for res in results])
     else:

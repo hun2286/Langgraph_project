@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from agent import app  # 질문자님의 에이전트
+from agent import app 
 import json
 import asyncio
 import uvicorn
