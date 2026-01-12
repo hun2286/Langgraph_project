@@ -39,5 +39,4 @@ async def chat(request: Request):
         )
 
 if __name__ == "__main__":
-    # 개발 편의를 위해 reload=True 권장
     uvicorn.run("main:api_app", host="127.0.0.1", port=8000, reload=True)
