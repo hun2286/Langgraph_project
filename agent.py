@@ -19,7 +19,7 @@ persist_dir = "Cultural_db"
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 embedding_model = HuggingFaceEmbeddings(model_name="bespin-global/klue-sroberta-base-continue-learning-by-mnr")
-web_search_tool = DuckDuckGoSearchResults(num_results=3)
+web_search_tool = DuckDuckGoSearchResults(num_results=5)
 
 if os.path.exists(persist_dir) and os.listdir(persist_dir):
     vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embedding_model)
@@ -53,9 +53,11 @@ def web_search_node(state: GraphState):
     
     # 검색어에 날짜를 넣지 말고 지역명과 날씨 위주로 생성하도록 유도
     query_gen_prompt = f"""사용자 질문: {state['question']}
-위 질문에 대해 가장 최신 정보를 찾을 수 있는 검색어 1개만 생성하세요.
-- 날씨의 경우 '지역명 날씨' 형태로 생성하세요 (예: 광주 수기동 날씨)
-- 날짜를 검색어에 포함하지 마세요.
+당신은 전문 정보 검색원입니다. 위 질문에 대해 정확한 팩트를 찾기 위한 최적의 검색어 1개를 생성하세요.
+1. 문장 형태가 아닌 키워드 중심으로 구성하세요.
+2. 질문의 핵심 대상과 '종류', '현황', '목록'과 같은 명확한 단어를 조합하세요.
+3. 검색어는 딱 1개만 출력하세요.
+
 검색어:"""
     
     search_query = llm.invoke(query_gen_prompt).content.strip().replace('"', '')
@@ -63,13 +65,16 @@ def web_search_node(state: GraphState):
     
     results = web_search_tool.invoke(search_query)
     
-    # 데이터가 리스트 형태면 읽기 쉽게 변환
-    if isinstance(results, list):
+    # DuckDuckGo의 특수 문자열 출력 형식을 깔끔하게 정리
+    if isinstance(results, str):
+        # snippet 부분만 추출하거나 읽기 좋게 줄바꿈 정리
+        content_text = results.replace("], [", "]\n\n[").replace("snippet: ", "\n- 정보: ")
+    elif isinstance(results, list):
         content_text = "\n".join([f"- {res.get('snippet', '')}" for res in results])
     else:
         content_text = str(results)
 
-    print(f"--- [Raw Result Success] ---")
+    print(f"--- [Web Result Success] ---")
 
     return {
         "context": [f"### [검색된 실시간 정보]\n{content_text}"],
