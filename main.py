@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from agent import app  # 질문자님의 에이전트
+from agent import app 
 import uvicorn
 
 api_app = FastAPI()
@@ -21,7 +21,7 @@ async def chat(request: Request):
     inputs = {"question": question, "context": [], "sources": [], "retry_count": 0}
     
     try:
-        # 3. 비동기 방식으로 에이전트 실행 (ainvoke 사용)
+        # 3. 비동기 방식으로 에이전트 실행
         # 이 과정에서 서버의 이벤트 루프가 차단되지 않고 다른 요청을 처리할 수 있습니다.
         result = await app.ainvoke(inputs)
 
