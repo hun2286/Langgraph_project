@@ -65,7 +65,6 @@ def web_search_node(state: GraphState):
     
     results = web_search_tool.invoke(search_query)
     
-    # DuckDuckGo의 특수 문자열 출력 형식을 깔끔하게 정리
     if isinstance(results, str):
         # snippet 부분만 추출하거나 읽기 좋게 줄바꿈 정리
         content_text = results.replace("], [", "]\n\n[").replace("snippet: ", "\n- 정보: ")
