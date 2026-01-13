@@ -25,7 +25,7 @@ if os.path.exists(persist_dir) and os.listdir(persist_dir):
     vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embedding_model)
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 else:
-    print(f"[알림] 로컬 DB를 찾을 수 없습니다."); retriever = None
+    print(f"로컬 DB를 찾을 수 없습니다."); retriever = None
 
 # 2. 그래프 상태(State) 정의
 class GraphState(TypedDict):
@@ -101,7 +101,7 @@ def generate_node(state: GraphState):
 
 # 4. 조건부 엣지(Router) 로직
 def grade_documents_router(state: GraphState) -> Literal["generate", "web_search"]:
-    print("--- [Edge] 문서 적합성 평가 중 ---")
+    print("--- [Edge] 적합성 평가 중 ---")
     
     if not state["context"]:
         return "web_search"
