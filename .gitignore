@@ -14,6 +14,7 @@ __pycache__/
 # Embedding DB
 *db*
 database
+Cultural_db
 
 # Distribution / packaging
 .Python
