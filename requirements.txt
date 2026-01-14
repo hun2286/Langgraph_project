@@ -17,6 +17,13 @@ fastapi
 uvicorn
 jinja2
 
+# --- Database & API Validation ---
+sqlalchemy          
+pymysql             
+pydantic            
+pydantic-settings   
+python-multipart    
+
 # --- Document Processing & Vector DB ---
 sentence-transformers==5.0.0
 transformers==4.53.3
