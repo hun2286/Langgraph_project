@@ -20,5 +20,4 @@ COPY . .
 EXPOSE 8000
 
 # 7. 서버 실행 명령어
-# 실행 파일명이 agent.py이면 agent:app으로 수정!
 CMD ["uvicorn", "main:api_app", "--host", "0.0.0.0", "--port", "8000"]
