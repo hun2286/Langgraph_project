@@ -1,5 +1,6 @@
 import os
 import re
+import ast
 import sys
 import operator
 import json
@@ -42,14 +43,18 @@ def retrieve_node(state: GraphState):
         return {"context": [], "sources": [], "retry_count": 0}
     
     docs = retriever.invoke(state["question"])
+    
+    # web_search_node와 형식을 맞춤
+    numbered_docs = [
+        f"[{i+1}] 출처 제목: {doc.metadata.get('source', '로컬 DB 문서')}\n정보: {doc.page_content}" 
+        for i, doc in enumerate(docs)
+    ]
+    
     return {
-        "context": [doc.page_content for doc in docs],
+        "context": numbered_docs,
         "sources": [doc.metadata.get('source', '알 수 없음') for doc in docs],
         "retry_count": 0
     }
-
-import ast
-import re
 
 def web_search_node(state: GraphState):
     print("\n--- [Node] 웹 검색 수행 중 (쿼리 확장 및 출처 정리) ---")
@@ -122,18 +127,25 @@ def generate_node(state: GraphState):
     context_combined = "\n\n".join(all_contexts)
     
     prompt = [
-        ("system", """당신은 전문 분석가입니다.
-1. 모든 답변은 반드시 마크다운(Markdown) 형식을 사용하십시오.
-2. 주제에 맞는 적절한 ## 제목과 ### 소제목을 사용하여 구조화하십시오.
-3. 핵심 용어는 **굵게** 표시하고, 목록은 불렛 포인트(*)를 사용하십시오.
-4. 텍스트를 나열하지 말고, 독자가 한눈에 읽기 편하도록 문단을 나누십시오.
-5. 반드시 제공된 [데이터]에 있는 정보만을 바탕으로 답변하십시오. 데이터에 없는 내용을 지어내지 마십시오."""),
+        ("system", """당신은 전문 분석가입니다. 다음 규칙을 엄격히 준수하여 답변하십시오.
+
+1. 모든 답변은 마크다운(Markdown) 형식을 사용하고, ##와 ###로 구조화하십시오.
+2. **출처 인용**: 각 문장의 끝에 해당 정보의 근거가 되는 [데이터]의 번호를 기입하십시오. 
+   예시: "규사는 유리의 주성분입니다[1]."
+3. **참고 문헌 작성**: 답변의 가장 마지막에 '### 참고 문헌' 섹션을 만드십시오. 
+   여기에 사용된 각 번호와 해당 항목의 '출처 제목'을 리스트 형태로 나열하십시오.
+4. **엄격한 근거**: 반드시 제공된 [데이터]에 있는 정보만을 바탕으로 답변하십시오. 데이터에 없는 내용을 절대로 지어내지 마십시오.
+5. 핵심 용어는 **굵게** 표시하십시오."""),
         
         ("user", f"[데이터]:\n{context_combined}\n\n질문:\n{state['question']}")
     ]
     
     response = llm.invoke(prompt)
-    return {"answer": response.content.strip(), "retry_count": state.get("retry_count", 0) + 1}
+
+    return {
+        "answer": response.content.strip(), 
+        "retry_count": state.get("retry_count", 0) + 1
+    }
 
 # 4. 조건부 엣지(Router) 로직
 def grade_documents_router(state: GraphState) -> Literal["generate", "web_search"]:
