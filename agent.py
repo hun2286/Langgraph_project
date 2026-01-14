@@ -48,36 +48,72 @@ def retrieve_node(state: GraphState):
         "retry_count": 0
     }
 
+import ast
+import re
+
 def web_search_node(state: GraphState):
-    print("\n--- [Node] 웹 검색 수행 중 ---")
+    print("\n--- [Node] 웹 검색 수행 중 (쿼리 확장 및 출처 정리) ---")
     
-    # 검색어에 날짜를 넣지 말고 지역명과 날씨 위주로 생성하도록 유도
+    # 1. 쿼리 확장 프롬프트 (질문자님의 지침 반영)
     query_gen_prompt = f"""사용자 질문: {state['question']}
-당신은 전문 정보 검색원입니다. 위 질문에 대해 정확한 팩트를 찾기 위한 최적의 검색어 1개를 생성하세요.
+당신은 전문 정보 검색원입니다. 위 질문에 대해 정확한 팩트를 찾기 위해 
+서로 다른 관점의 최적화된 키워드 검색어 3개를 생성하세요.
+
+지침:
 1. 문장 형태가 아닌 키워드 중심으로 구성하세요.
-2. 질문의 핵심 대상과 '종류', '현황', '목록'과 같은 명확한 단어를 조합하세요.
-3. 검색어는 딱 1개만 출력하세요.
+2. 각 검색어는 질문의 핵심 대상과 '종류', '현황', '성분', '역사' 등 서로 다른 속성을 조합하세요.
+3. 결과는 반드시 파이썬 리스트 형식으로만 출력하세요. (예: ["키워드1", "키워드2", "키워드3"])
 
 검색어:"""
     
-    search_query = llm.invoke(query_gen_prompt).content.strip().replace('"', '')
-    print(f"--- [Search Query]: {search_query} ---")
+    # 2. LLM으로부터 검색어 리스트 수신
+    raw_query_res = llm.invoke(query_gen_prompt).content.strip()
     
-    results = web_search_tool.invoke(search_query)
-    
-    if isinstance(results, str):
-        # snippet 부분만 추출하거나 읽기 좋게 줄바꿈 정리
-        content_text = results.replace("], [", "]\n\n[").replace("snippet: ", "\n- 정보: ")
-    elif isinstance(results, list):
-        content_text = "\n".join([f"- {res.get('snippet', '')}" for res in results])
-    else:
-        content_text = str(results)
+    # 3. 문자열 리스트를 실제 파이썬 리스트로 변환
+    try:
+        list_str = re.search(r"\[.*\]", raw_query_res, re.DOTALL).group()
+        search_queries = ast.literal_eval(list_str)
+    except:
+        search_queries = [state['question']]
 
-    print(f"--- [Web Result Success] ---")
+    final_contexts = []
+    
+    # 4. 3개의 검색어를 각각 순회하며 검색 수행
+    for query in search_queries:
+        print(f"--- [Search Query]: {query} ---")
+        try:
+            results = web_search_tool.invoke(query)
+            
+            if isinstance(results, str):
+                # DuckDuckGoSearchResults의 일반적인 출력 형식을 파싱
+                items = re.findall(r"\[snippet: (.*?), title: (.*?), link: (.*?)\]", results)
+                for snippet, title, link in items:
+                    final_contexts.append(f"출처 제목: {title}\n정보: {snippet}")
+                    
+            elif isinstance(results, list):
+                for res in results:
+                    title = res.get('title', '알 수 없는 제목')
+                    snippet = res.get('snippet', '')
+                    final_contexts.append(f"출처 제목: {title}\n정보: {snippet}")
+        except Exception as e:
+            print(f"검색 중 오류 발생 ({query}): {e}")
+
+    # 5. 중복 제거 및 상위 5개 선택
+    unique_contexts = list(dict.fromkeys(final_contexts)) # 내용 중복 제거
+    selected_contexts = unique_contexts[:5] # 상위 5개 제한
+    
+    # 6. 최종적으로 번호 부여
+    numbered_contexts = [f"[{i+1}] {ctx}" for i, ctx in enumerate(selected_contexts)]
+
+    # 결과가 없을 경우 방어 로직
+    if not numbered_contexts:
+        numbered_contexts = ["### [검색 결과]\n관련된 실시간 정보를 찾지 못했습니다."]
+
+    print(f"--- [Web Result Success]: 총 {len(numbered_contexts)}건의 정보 선택 완료 ---")
 
     return {
-        "context": [f"### [검색된 실시간 정보]\n{content_text}"],
-        "sources": ["웹 검색"]
+        "context": numbered_contexts,
+        "sources": ["웹 검색 결과"]
     }
 
 def generate_node(state: GraphState):
