@@ -1,6 +1,5 @@
 import os
 import re
-import ast
 import sys
 import operator
 import json
@@ -13,6 +12,9 @@ from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.tools import DuckDuckGoSearchResults
 from langgraph.graph import StateGraph, END
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # 1. 환경 설정 및 로드
 load_dotenv()
@@ -32,6 +34,7 @@ else:
 class GraphState(TypedDict):
     question: str
     context: Annotated[List[str], operator.add]
+    sources: Annotated[List[str], operator.add]
     answer: str
     retry_count: int
 
@@ -39,122 +42,82 @@ class GraphState(TypedDict):
 def retrieve_node(state: GraphState):
     print("\n--- [Node] DB 검색 수행 중 ---")
     if retriever is None:
-        return {"context": []}
+        return {"context": [], "sources": [], "retry_count": 0}
     
     docs = retriever.invoke(state["question"])
-    
-    # web_search_node와 형식을 맞춤
-    formatted_docs = [
-        f"출처 제목: {doc.metadata.get('source', '내부 문서')}\n정보: {doc.page_content}" 
-        for doc in docs
-    ]
-    
     return {
-        "context": formatted_docs, 
+        "context": [doc.page_content for doc in docs],
+        "sources": [doc.metadata.get('source', '알 수 없음') for doc in docs],
         "retry_count": 0
-        }
+    }
 
 def web_search_node(state: GraphState):
     print("\n--- [Node] 웹 검색 수행 중 ---")
     
-    # 1. 쿼리 확장 프롬프트 (질문자님의 지침 반영)
+    # 검색어에 날짜를 넣지 말고 지역명과 날씨 위주로 생성하도록 유도
     query_gen_prompt = f"""사용자 질문: {state['question']}
-당신은 전문 정보 검색원입니다. 위 질문에 대해 정확한 팩트를 찾기 위해 
-서로 다른 관점의 최적화된 키워드 검색어 3개를 생성하세요.
-
-지침:
+당신은 전문 정보 검색원입니다. 위 질문에 대해 정확한 팩트를 찾기 위한 최적의 검색어 1개를 생성하세요.
 1. 문장 형태가 아닌 키워드 중심으로 구성하세요.
-2. 각 검색어는 질문의 핵심 대상과 '종류', '현황', '성분', '역사' 등 서로 다른 속성을 조합하세요.
-3. 결과는 반드시 파이썬 리스트 형식으로만 출력하세요. (예: ["키워드1", "키워드2", "키워드3"])
+2. 질문의 핵심 대상과 '종류', '현황', '목록'과 같은 명확한 단어를 조합하세요.
+3. 검색어는 딱 1개만 출력하세요.
 
 검색어:"""
     
-    raw_res = llm.invoke(query_gen_prompt).content.strip()
-    try:
-        queries = ast.literal_eval(re.search(r"\[.*\]", raw_res, re.DOTALL).group())
-    except:
-        queries = [state['question']]
+    search_query = llm.invoke(query_gen_prompt).content.strip().replace('"', '')
+    print(f"--- [Search Query]: {search_query} ---")
+    
+    results = web_search_tool.invoke(search_query)
+    
+    if isinstance(results, str):
+        # snippet 부분만 추출하거나 읽기 좋게 줄바꿈 정리
+        content_text = results.replace("], [", "]\n\n[").replace("snippet: ", "\n- 정보: ")
+    elif isinstance(results, list):
+        content_text = "\n".join([f"- {res.get('snippet', '')}" for res in results])
+    else:
+        content_text = str(results)
 
-    web_contexts = []
-    for q in queries:
-        print(f"--- [Search Query]: {q} ---")
-        try:
-            results = web_search_tool.invoke(q)
-            # DuckDuckGo 결과 파싱
-            items = re.findall(r"snippet: (.*?), title: (.*?), link: (.*?)\]", results)
-            for snippet, title, link in items:
-                web_contexts.append(f"출처 제목: {title}\n정보: {snippet}")
-        except:
-            continue
+    print(f"--- [Web Result Success] ---")
 
-    return {"context": web_contexts}
+    return {
+        "context": [f"### [검색된 실시간 정보]\n{content_text}"],
+        "sources": ["웹 검색"]
+    }
 
 def generate_node(state: GraphState):
     print("\n--- [Node] 답변 생성 중 ---")
-    raw_contexts = state.get("context", [])
-    
-    # [핵심] 출처 제목이 같은 것들을 하나로 합쳐 중복 제거
-    grouped = {}
-    for ctx in raw_contexts:
-        parts = ctx.split('\n')
-        if len(parts) < 2: continue
-        title = parts[0].replace("출처 제목: ", "").strip()
-        info = parts[1].replace("정보: ", "").strip()
-        
-        if title not in grouped:
-            grouped[title] = []
-        if info not in grouped[title]: # 내용 중복도 체크
-            grouped[title].append(info)
-    
-    # 제목별로 내용을 합치고 상위 5개만 번호 매기기
-    unique_contexts = []
-    for title, infos in grouped.items():
-        unique_contexts.append(f"출처 제목: {title}\n정보: {' '.join(infos)}")
-
-    final_contexts = [f"[{i+1}] {ctx}" for i, ctx in enumerate(unique_contexts[:5])]
-    context_combined = "\n\n".join(final_contexts)
+    all_contexts = state.get("context", [])
+    context_combined = "\n\n".join(all_contexts)
     
     prompt = [
-        ("system", """당신은 전문 분석가입니다. 다음 규칙을 엄격히 준수하여 답변하십시오.
-
-1. 모든 답변은 마크다운(Markdown) 형식을 사용하고, ##와 ###로 구조화하십시오.
-2. **출처 인용**: 각 문장의 끝에 해당 정보의 근거가 되는 [데이터]의 번호를 기입하십시오. 
-   예시: "규사는 유리의 주성분입니다[1]."
-3. **참고 문헌 작성**: 답변의 가장 마지막에 '### 참고 문헌' 섹션을 만드십시오. 
-   여기에 사용된 각 번호와 해당 항목의 '출처 제목'을 리스트 형태로 나열하십시오.
-4. **엄격한 근거**: 반드시 제공된 [데이터]에 있는 정보만을 바탕으로 답변하십시오. 데이터에 없는 내용을 절대로 지어내지 마십시오.
-5. 핵심 용어는 **굵게** 표시하십시오."""),
+        ("system", """당신은 전문 분석가입니다.
+1. 모든 답변은 반드시 마크다운(Markdown) 형식을 사용하십시오.
+2. 주제에 맞는 적절한 ## 제목과 ### 소제목을 사용하여 구조화하십시오.
+3. 핵심 용어는 **굵게** 표시하고, 목록은 불렛 포인트(*)를 사용하십시오.
+4. 텍스트를 나열하지 말고, 독자가 한눈에 읽기 편하도록 문단을 나누십시오.
+5. 반드시 제공된 [데이터]에 있는 정보만을 바탕으로 답변하십시오. 데이터에 없는 내용을 지어내지 마십시오."""),
         
         ("user", f"[데이터]:\n{context_combined}\n\n질문:\n{state['question']}")
     ]
     
     response = llm.invoke(prompt)
-
-    return {
-        "answer": response.content.strip(), 
-        "retry_count": state.get("retry_count", 0) + 1
-    }
+    return {"answer": response.content.strip(), "retry_count": state.get("retry_count", 0) + 1}
 
 # 4. 조건부 엣지(Router) 로직
 def grade_documents_router(state: GraphState) -> Literal["generate", "web_search"]:
     print("--- [Edge] 적합성 평가 중 ---")
     
-    # [핵심] DB에서 찾은 모든 문서(5개)를 합쳐서 판단
-    full_content = "\n".join(state["context"])
+    if not state["context"]:
+        return "web_search"
     
-    score_prompt = f"""질문: {state['question']}\n검색된 데이터 전체:\n{full_content[:2000]}\n
-위 데이터들만으로 질문에 대한 충분한 답변이 가능합니까? 
-조금이라도 부족하다면 반드시 'NO', 충분하다면 'YES'라고만 답하세요."""
+    # 지침 강화: "모호하면 NO라고 하라"는 지시 추가
+    score_prompt = f"""질문: {state['question']}\n데이터: {state['context'][0][:500]}\n
+    위 데이터에 질문에 대한 핵심 정보가 직접적으로 포함되어 있습니까? 
+    조금이라도 모호하거나 내용이 부족하면 무조건 'NO'라고 답하세요. (YES/NO)"""
     
     res = llm.invoke(score_prompt)
-    decision = res.content.strip().upper()
-    
-    if "YES" in decision:
-        print("--- [Decision] DB 내용 충분: 웹 검색 생략 ---")
+    if "yes" in res.content.strip().lower():
         return "generate"
-    else:
-        print("--- [Decision] DB 내용 부족: 웹 검색 진행 ---")
-        return "web_search"
+    return "web_search"
 
 def check_quality_router(state: GraphState) -> Literal["finish", "re_generate"]:
     print("--- [Edge] 품질 검수 중 ---")
