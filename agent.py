@@ -32,7 +32,6 @@ else:
 class GraphState(TypedDict):
     question: str
     context: Annotated[List[str], operator.add]
-    sources: Annotated[List[str], operator.add]
     answer: str
     retry_count: int
 
@@ -40,24 +39,23 @@ class GraphState(TypedDict):
 def retrieve_node(state: GraphState):
     print("\n--- [Node] DB 검색 수행 중 ---")
     if retriever is None:
-        return {"context": [], "sources": [], "retry_count": 0}
+        return {"context": []}
     
     docs = retriever.invoke(state["question"])
     
     # web_search_node와 형식을 맞춤
-    numbered_docs = [
-        f"[{i+1}] 출처 제목: {doc.metadata.get('source', '로컬 DB 문서')}\n정보: {doc.page_content}" 
-        for i, doc in enumerate(docs)
+    formatted_docs = [
+        f"출처 제목: {doc.metadata.get('source', '내부 문서')}\n정보: {doc.page_content}" 
+        for doc in docs
     ]
     
     return {
-        "context": numbered_docs,
-        "sources": [doc.metadata.get('source', '알 수 없음') for doc in docs],
+        "context": formatted_docs, 
         "retry_count": 0
-    }
+        }
 
 def web_search_node(state: GraphState):
-    print("\n--- [Node] 웹 검색 수행 중 (쿼리 확장 및 출처 정리) ---")
+    print("\n--- [Node] 웹 검색 수행 중 ---")
     
     # 1. 쿼리 확장 프롬프트 (질문자님의 지침 반영)
     query_gen_prompt = f"""사용자 질문: {state['question']}
@@ -71,60 +69,50 @@ def web_search_node(state: GraphState):
 
 검색어:"""
     
-    # 2. LLM으로부터 검색어 리스트 수신
-    raw_query_res = llm.invoke(query_gen_prompt).content.strip()
-    
-    # 3. 문자열 리스트를 실제 파이썬 리스트로 변환
+    raw_res = llm.invoke(query_gen_prompt).content.strip()
     try:
-        list_str = re.search(r"\[.*\]", raw_query_res, re.DOTALL).group()
-        search_queries = ast.literal_eval(list_str)
+        queries = ast.literal_eval(re.search(r"\[.*\]", raw_res, re.DOTALL).group())
     except:
-        search_queries = [state['question']]
+        queries = [state['question']]
 
-    final_contexts = []
-    
-    # 4. 3개의 검색어를 각각 순회하며 검색 수행
-    for query in search_queries:
-        print(f"--- [Search Query]: {query} ---")
+    web_contexts = []
+    for q in queries:
+        print(f"--- [Search Query]: {q} ---")
         try:
-            results = web_search_tool.invoke(query)
-            
-            if isinstance(results, str):
-                # DuckDuckGoSearchResults의 일반적인 출력 형식을 파싱
-                items = re.findall(r"\[snippet: (.*?), title: (.*?), link: (.*?)\]", results)
-                for snippet, title, link in items:
-                    final_contexts.append(f"출처 제목: {title}\n정보: {snippet}")
-                    
-            elif isinstance(results, list):
-                for res in results:
-                    title = res.get('title', '알 수 없는 제목')
-                    snippet = res.get('snippet', '')
-                    final_contexts.append(f"출처 제목: {title}\n정보: {snippet}")
-        except Exception as e:
-            print(f"검색 중 오류 발생 ({query}): {e}")
+            results = web_search_tool.invoke(q)
+            # DuckDuckGo 결과 파싱
+            items = re.findall(r"snippet: (.*?), title: (.*?), link: (.*?)\]", results)
+            for snippet, title, link in items:
+                web_contexts.append(f"출처 제목: {title}\n정보: {snippet}")
+        except:
+            continue
 
-    # 5. 중복 제거 및 상위 5개 선택
-    unique_contexts = list(dict.fromkeys(final_contexts)) # 내용 중복 제거
-    selected_contexts = unique_contexts[:5] # 상위 5개 제한
-    
-    # 6. 최종적으로 번호 부여
-    numbered_contexts = [f"[{i+1}] {ctx}" for i, ctx in enumerate(selected_contexts)]
-
-    # 결과가 없을 경우 방어 로직
-    if not numbered_contexts:
-        numbered_contexts = ["### [검색 결과]\n관련된 실시간 정보를 찾지 못했습니다."]
-
-    print(f"--- [Web Result Success]: 총 {len(numbered_contexts)}건의 정보 선택 완료 ---")
-
-    return {
-        "context": numbered_contexts,
-        "sources": ["웹 검색 결과"]
-    }
+    return {"context": web_contexts}
 
 def generate_node(state: GraphState):
     print("\n--- [Node] 답변 생성 중 ---")
-    all_contexts = state.get("context", [])
-    context_combined = "\n\n".join(all_contexts)
+    raw_contexts = state.get("context", [])
+    
+    # [핵심] 출처 제목이 같은 것들을 하나로 합쳐 중복 제거
+    grouped = {}
+    for ctx in raw_contexts:
+        parts = ctx.split('\n')
+        if len(parts) < 2: continue
+        title = parts[0].replace("출처 제목: ", "").strip()
+        info = parts[1].replace("정보: ", "").strip()
+        
+        if title not in grouped:
+            grouped[title] = []
+        if info not in grouped[title]: # 내용 중복도 체크
+            grouped[title].append(info)
+    
+    # 제목별로 내용을 합치고 상위 5개만 번호 매기기
+    unique_contexts = []
+    for title, infos in grouped.items():
+        unique_contexts.append(f"출처 제목: {title}\n정보: {' '.join(infos)}")
+
+    final_contexts = [f"[{i+1}] {ctx}" for i, ctx in enumerate(unique_contexts[:5])]
+    context_combined = "\n\n".join(final_contexts)
     
     prompt = [
         ("system", """당신은 전문 분석가입니다. 다음 규칙을 엄격히 준수하여 답변하십시오.
@@ -151,18 +139,22 @@ def generate_node(state: GraphState):
 def grade_documents_router(state: GraphState) -> Literal["generate", "web_search"]:
     print("--- [Edge] 적합성 평가 중 ---")
     
-    if not state["context"]:
-        return "web_search"
+    # [핵심] DB에서 찾은 모든 문서(5개)를 합쳐서 판단
+    full_content = "\n".join(state["context"])
     
-    # 지침 강화: "모호하면 NO라고 하라"는 지시 추가
-    score_prompt = f"""질문: {state['question']}\n데이터: {state['context'][0][:500]}\n
-    위 데이터에 질문에 대한 핵심 정보가 직접적으로 포함되어 있습니까? 
-    조금이라도 모호하거나 내용이 부족하면 무조건 'NO'라고 답하세요. (YES/NO)"""
+    score_prompt = f"""질문: {state['question']}\n검색된 데이터 전체:\n{full_content[:2000]}\n
+위 데이터들만으로 질문에 대한 충분한 답변이 가능합니까? 
+조금이라도 부족하다면 반드시 'NO', 충분하다면 'YES'라고만 답하세요."""
     
     res = llm.invoke(score_prompt)
-    if "yes" in res.content.strip().lower():
+    decision = res.content.strip().upper()
+    
+    if "YES" in decision:
+        print("--- [Decision] DB 내용 충분: 웹 검색 생략 ---")
         return "generate"
-    return "web_search"
+    else:
+        print("--- [Decision] DB 내용 부족: 웹 검색 진행 ---")
+        return "web_search"
 
 def check_quality_router(state: GraphState) -> Literal["finish", "re_generate"]:
     print("--- [Edge] 품질 검수 중 ---")
