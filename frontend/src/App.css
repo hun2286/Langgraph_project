@@ -1,0 +1,175 @@
+/* 1. 전체 화면 고정 */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden; /* 바깥 스크롤 절대 방지 */
+  background: #f0f2f5;
+  font-family: 'Pretendard', sans-serif;
+}
+
+.page-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* 2. 메인 컨테이너 (이 안에서 모든 게 해결됨) */
+.content-container {
+  width: 100%;
+  max-width: 800px;
+  height: 85vh; /* 화면 높이의 85% 고정 */
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  
+  display: flex;
+  flex-direction: column; /* 세로로 쌓기 */
+  box-sizing: border-box; /* 패딩이 너비를 넘지 않게 */
+}
+
+header {
+  flex-shrink: 0; /* 헤더 크기 고정 */
+  margin-bottom: 10px;
+}
+
+header h1 { font-size: 1.5rem; margin: 0; color: #333; }
+header hr { border: 0; height: 1px; background: #eee; margin: 15px 0; }
+
+/* 3. 답변 박스 (중간 영역 전체 차지 + 스크롤) */
+.answer-box {
+  flex: 1; /* 남는 모든 공간 차지 */
+  overflow-y: auto; /* 내용 많을 때만 스크롤 */
+  background-color: #f9f9f9;
+  border: 1px solid #edf2f7;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+/* 4. 입력 폼 (하단에 딱 붙음) */
+.input-form {
+  flex-shrink: 0; /* 절대 밀려나지 않음 */
+  display: flex;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 1rem;
+  outline: none;
+}
+
+.chat-input:focus { border-color: #3182ce; }
+
+.submit-button {
+  padding: 0 25px;
+  background-color: #3182ce;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  white-space: nowrap; /* 글자 줄바꿈 방지 */
+}
+
+/* --- 답변 텍스트 기본 스타일 --- */
+.answer-text {
+  line-height: 1.8;
+  color: #2d3748; /* 짙은 회색 (가독성 가장 좋음) */
+  font-size: 1.05rem;
+  width: 100%;
+}
+
+/* 마크다운 제목(###) 색상 */
+.answer-text h1, .answer-text h2, .answer-text h3 {
+  color: #1a202c; /* 거의 검정색 */
+  margin-top: 20px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+/* 마크다운 강조(**) 스타일 */
+.answer-text strong {
+  color: #2b6cb0; /* 세련된 파란색 강조 */
+  background-color: #ebf8ff; /* 강조 배경색 */
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* 마크다운 리스트 스타일 */
+.answer-text ul, .answer-text ol {
+  padding-left: 20px;
+  margin-bottom: 15px;
+}
+
+.answer-text li {
+  margin-bottom: 8px;
+}
+
+/* 로딩 애니메이션 중앙 배치 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+/* 추가: 로딩 텍스트 스타일 (애니메이션 포함) */
+.loading-text {
+  font-size: 1rem;
+  color: #3182ce;
+  font-weight: 600;
+  margin-top: 15px;
+  /* 깜빡이는 효과로 시인성 확보 */
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* 보강: 답변 박스 내부 정렬 */
+.answer-box {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+  border: 1px solid #edf2f7;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: left;
+  /* 내부 요소(로딩 컨테이너 등)를 수직 중앙 정렬하기 위해 추가 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 로딩 중일 때만 중앙 정렬 강제 적용 */
+.answer-box:has(.loading-container) {
+  justify-content: center;
+  align-items: center;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #3182ce;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
