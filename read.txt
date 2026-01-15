@@ -1,5 +1,0 @@
-# 추후 필요하면 여기 작성
-
-uvicorn main:api_app --host 127.0.0.1 --port 8000 --reload
-
-uvicorn main:api_app --host 0.0.0.0 --port 8000 --reload
