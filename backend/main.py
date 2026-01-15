@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 try:
     from agent import app
 except ImportError:
-    # 파일이 없을 경우를 대비한 Mock 객체 (실제로는 agent.py가 있어야 함)
+    # 파일이 없을 경우를 대비한 Mock 객체 
     class MockApp:
         async def ainvoke(self, inputs):
             return {"answer": f"에이전트 연결 확인: {inputs['question']}"}
