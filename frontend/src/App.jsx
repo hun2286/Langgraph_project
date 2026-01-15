@@ -13,7 +13,7 @@ function App() {
     e.preventDefault();
     if (!question.trim()) return;
 
-    // 보낼 질문 임시 저장 후 입력창 즉시 비우기
+    // 보낼 질문 임시 저장 후 입력창 바로 비우기
     const sendData = question;
     setQuestion(''); 
     

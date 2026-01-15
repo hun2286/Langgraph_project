@@ -93,7 +93,7 @@ header hr { border: 0; height: 1px; background: #eee; margin: 15px 0; }
 
 /* 마크다운 제목(###) 색상 */
 .answer-text h1, .answer-text h2, .answer-text h3 {
-  color: #1a202c; /* 거의 검정색 */
+  color: #1a202c; 
   margin-top: 20px;
   margin-bottom: 10px;
   border-bottom: 1px solid #eee;
