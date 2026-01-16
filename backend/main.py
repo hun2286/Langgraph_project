@@ -3,16 +3,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-# agent.py에서 완성된 LangGraph app을 가져옵니다.
-try:
-    from agent import app
-except ImportError:
-    # 파일이 없을 경우를 대비한 Mock 객체 
-    class MockApp:
-        async def ainvoke(self, inputs):
-            return {"answer": f"에이전트 연결 확인: {inputs['question']}"}
-    app = MockApp()
+from agent import app
 
 # --- App Initialize ---
 api_app = FastAPI()
