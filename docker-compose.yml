@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # 백엔드: http://localhost:8000
+  backend:
+    build: ./backend
+    container_name: langgraph-back
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/Cultural_db:/app/Cultural_db      # 벡터 DB 유지
+      - ./backend/model_cache:/app/model_cache    # 모델 재다운로드 방지 (속도 향상)
+
+  # 프론트엔드: http://localhost
+  frontend:
+    build: ./frontend
+    container_name: react-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
