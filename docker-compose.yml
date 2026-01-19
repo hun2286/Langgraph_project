@@ -11,13 +11,13 @@ services:
       - ./backend/.env
     volumes:
       - ./backend/Cultural_db:/app/Cultural_db      # 벡터 DB 유지
-      - ./backend/model_cache:/app/model_cache    # 모델 재다운로드 방지 (속도 향상)
+      - ./backend/model_cache:/app/model_cache    # 모델 재다운로드 방지
 
   # 프론트엔드: http://localhost
   frontend:
     build: ./frontend
     container_name: react-frontend
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
