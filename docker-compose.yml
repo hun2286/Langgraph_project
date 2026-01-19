@@ -5,6 +5,10 @@ services:
   backend:
     build: ./backend
     container_name: langgraph-back
+    tty : true
+    stdin_open : true
+    environment:
+      - PYTHONUNBUFFERED=1
     ports:
       - "8000:8000"
     env_file:
