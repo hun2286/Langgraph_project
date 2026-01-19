@@ -21,7 +21,8 @@ function App() {
     setAnswer(''); 
     
     try {
-      const response = await axios.post('http://localhost:8000/chat', {
+      const host = window.location.hostname; // 접속한 브라우저의 현재 주소를 가져옴
+      const response = await axios.post(`http://${host}:8000/chat`, {
         question: sendData
       });
       setAnswer(response.data.answer);

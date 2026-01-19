@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# 3. 의존성 설치 (requirements.txt에 gunicorn, uvicorn이 포함되어야 함)
+# 3. 의존성 설치
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gunicorn uvicorn
@@ -16,5 +16,5 @@ RUN pip install gunicorn uvicorn
 # 4. 소스 코드 복사
 COPY . .
 
-# 5. 실행 (윈도우에선 안 되었던 gunicorn이 여기선 잘 돌아갑니다)
+# 5. 실행 
 CMD ["gunicorn", "main:api_app", "--workers", "2", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
