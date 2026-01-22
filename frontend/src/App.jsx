@@ -15,11 +15,11 @@ function App() {
 
     // 보낼 질문 임시 저장 후 입력창 바로 비우기
     const sendData = question;
-    setQuestion(''); 
-    
+    setQuestion('');
+
     setLoading(true);
-    setAnswer(''); 
-    
+    setAnswer('');
+
     try {
       const host = window.location.hostname; // 접속한 브라우저의 현재 주소를 가져옴
       const response = await axios.post(`http://${host}:8000/chat`, {
