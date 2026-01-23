@@ -127,10 +127,17 @@ def grade_documents_router(state: GraphState) -> Literal["generate", "web_search
     if not state["context"]:
         return "web_search"
 
-    # 지침 강화: "모호하면 NO라고 하라"는 지시 추가
-    score_prompt = f"""질문: {state['question']}\n데이터: {state['context'][0][:500]}\n
-    위 데이터에 질문에 대한 핵심 정보가 직접적으로 포함되어 있습니까? 
-    조금이라도 모호하거나 내용이 부족하면 무조건 'NO'라고 답하세요. (YES/NO)"""
+    full_context = "\n\n".join(state["context"])
+    score_prompt = f"""질문: {state['question']}
+    
+[데이터]:{full_context}
+
+당신은 데이터 판독관입니다. 
+1. 위 데이터 중 어느 하나라도 질문에 대한 답변 근거를 포함하고 있다면 'YES'라고 하세요.
+2. 여러 문서에 정보가 흩어져 있어도 합쳐서 답변이 가능하다면 'YES'입니다.
+3. 아예 관련이 없거나 추측해야 하는 경우에만 'NO'라고 하세요.
+
+결과(YES/NO):"""
 
     res = llm.invoke(score_prompt)
     if "yes" in res.content.strip().lower():
