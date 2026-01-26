@@ -3,8 +3,8 @@ services:
   backend:
     build: ./backend
     container_name: langgraph-back
-    tty : true
-    stdin_open : true
+    tty: true
+    stdin_open: true
     environment:
       - PYTHONUNBUFFERED=1
     ports:
@@ -12,8 +12,8 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      - ./backend/Cultural_db:/app/Cultural_db      # 벡터 DB 유지
-      - ./backend/model_cache:/app/model_cache    # 모델 재다운로드 방지
+      - ./backend/Cultural_db:/app/Cultural_db # 벡터 DB 유지
+      - ./backend/model_cache:/app/model_cache # 모델 재다운로드 방지
 
   # 프론트엔드: http://localhost
   frontend:
