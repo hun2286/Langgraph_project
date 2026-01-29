@@ -13,7 +13,7 @@ function App() {
     e.preventDefault();
     if (!question.trim()) return;
 
-    // 보낼 질문 임시 저장 후 입력창 바로 비우기
+    // 입력창 비우기
     const sendData = question;
     setQuestion('');
 
@@ -21,7 +21,7 @@ function App() {
     setAnswer('');
 
     try {
-      const host = window.location.hostname; // 접속한 브라우저의 현재 주소를 가져옴
+      const host = window.location.hostname; // 주소 가져오기
       const response = await axios.post(`http://${host}:8000/chat`, {
         question: sendData
       });
@@ -65,7 +65,7 @@ function App() {
             className="chat-input"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="궁금한 내용을 입력하세요..."
+            placeholder="내용을 입력하세요..."
           />
           <button type="submit" className="submit-button" disabled={loading}>
             질문하기
