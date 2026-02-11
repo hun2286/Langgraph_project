@@ -18,6 +18,7 @@ api_app.add_middleware(
 )
 
 
+# 주석 추가
 # --- Routes ---
 @api_app.post("/chat")
 async def chat(request: Request):
